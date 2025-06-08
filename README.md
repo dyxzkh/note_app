@@ -17,6 +17,7 @@ note_app/
 ## 🚀 Features
 
 ### Backend (`note_webapi`)
+
 - ASP.NET Core 9
 - RESTful API architecture
 - JWT authentication
@@ -27,6 +28,7 @@ note_app/
 - Docker support
 
 ### Frontend (`note_webui`)
+
 - Vue 3 + Vite + TypeScript
 - Pinia (state management)
 - Vue Router
@@ -36,13 +38,33 @@ note_app/
 
 ---
 
+### Frontend
+
+- 🔐 Login/Register forms
+- 📝 Notes list with full **CRUD operations**
+- 🔍 Search, filter, and sort notes
+- 📱 Responsive design with Tailwind CSS
+- 🔗 API integration via Axios
+- 🧠 State management using Pinia
+
+### Backend
+
+- 🔐 Authentication & Authorization
+- ✨ Notes CRUD endpoints
+- 🔒 Users can only manage **their own notes**
+- 💽 Dapper-based data access with SQL Server
+
+---
+
 ## 🔧 Prerequisites
 
 ### Backend
+
 - [.NET 9 SDK](https://dotnet.microsoft.com/)
 - (Optional) Docker
 
 ### Frontend
+
 - Node.js (LTS)
 - npm or yarn
 
@@ -91,11 +113,13 @@ Frontend app should be available at `http://localhost:3000`.
 ## 🔐 Environment Variables
 
 ### Backend (`note_webapi/appsettings.json`)
+
 - JWT Secret
 - Database connection string
 - Token expiration settings
 
 ### Frontend (`.env.example`)
+
 ```
 VITE_API_BASE_URL=http://localhost:5225/api
 ```
@@ -104,14 +128,14 @@ VITE_API_BASE_URL=http://localhost:5225/api
 
 ## 🧪 API Endpoints
 
-| Method | Endpoint           | Description              |
-|--------|--------------------|--------------------------|
-| POST   | /api/auth/login    | Login with credentials   |
-| POST   | /api/auth/register | Register new user        |
-| GET    | /api/notes         | Get all user notes       |
-| POST   | /api/notes         | Create a new note        |
-| PUT    | /api/notes/{id}    | Update a note            |
-| DELETE | /api/notes/{id}    | Delete a note            |
+| Method | Endpoint           | Description            |
+| ------ | ------------------ | ---------------------- |
+| POST   | /api/auth/login    | Login with credentials |
+| POST   | /api/auth/register | Register new user      |
+| GET    | /api/notes         | Get all user notes     |
+| POST   | /api/notes         | Create a new note      |
+| PUT    | /api/notes/{id}    | Update a note          |
+| DELETE | /api/notes/{id}    | Delete a note          |
 
 ---
 
