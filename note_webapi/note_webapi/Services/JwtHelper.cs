@@ -18,7 +18,7 @@ public static class JwtHelper
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim("id", user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Fullname),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, user.RoleName ?? "User")

@@ -1,6 +1,7 @@
 using System.Data;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using note_webapi.DTOs;
 using note_webapi.Interfaces;
 using note_webapi.Models;
 
@@ -12,13 +13,21 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
     private readonly IBcryptService _bcrypt = bcrypt;
     private readonly ILogger<UserRepository> _logger = logger;
     private IDbConnection Connection => new SqlConnection(_connectionString);
-    
+
     public async Task<IEnumerable<User>> GetAllAsync()
     {
         using var db = Connection;
         return await db.QueryAsync<User>($"SELECT * FROM Users");
     }
-    
+
+    public async Task<int?> GetByUserRoleIdByNameAsync(string name)
+    {
+        using var db = Connection;
+        return await db.ExecuteScalarAsync<int?>(
+            "SELECT Id FROM Roles WHERE RoleName = @Name",
+            new { Name = name });
+    }
+
     public async Task<User?> GetUserWithRoleByEmailAsync(string email)
     {
         using var db = Connection;
@@ -55,15 +64,18 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
     {
         using var db = Connection;
         return await db.QueryFirstOrDefaultAsync<User>(
-            "SELECT * FROM Users WHERE RefreshToken = @RefreshToken", 
+            "SELECT * FROM Users WHERE RefreshToken = @RefreshToken",
             new { RefreshToken = token });
     }
 
-    public async Task<User?> GetByIdAsync(int id)
+    public async Task<GetUser?> GetByIdAsync(int id)
     {
         using var db = Connection;
-        return await db.QueryFirstOrDefaultAsync<User>(
-            "SELECT * FROM Users WHERE Id = @Id", 
+        return await db.QueryFirstOrDefaultAsync<GetUser>(
+            @"SELECT u.Fullname, u.Email, u.Id, u.RoleId, r.RoleName 
+                FROM Users AS u 
+                INNER JOIN Roles AS r ON u.RoleId = r.Id
+                WHERE u.Id = @Id",
             new { Id = id });
     }
 
@@ -71,14 +83,14 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
     {
         using var db = Connection;
         return await db.QueryFirstOrDefaultAsync<User>(
-            "SELECT * FROM Users WHERE Email = @Email", 
+            "SELECT * FROM Users WHERE Email = @Email",
             new { Email = email });
     }
 
     public async Task<RepositoryResult<int>> CreateAsync(User user)
     {
         using var db = Connection;
-        
+
         // Check if email already exists
         var existingUser = await GetByEmailAsync(user.Email);
         if (existingUser != null)
@@ -96,14 +108,90 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
             var hashedPassword = _bcrypt.HashPassword(user.Password);
             user.Password = hashedPassword;
             user.CreatedAt = DateTime.UtcNow;
-            
+
             var sql = @"
                 INSERT INTO Users (Fullname, Email, Password, CreatedAt, RoleId) 
                 VALUES (@Fullname, @Email, @Password, @CreatedAt, @RoleId); 
                 SELECT CAST(SCOPE_IDENTITY() as int);";
-                
+
             var newId = await db.ExecuteScalarAsync<int>(sql, user);
-            
+
+            return new RepositoryResult<int>
+            {
+                Success = true,
+                Data = newId
+            };
+        }
+        catch (SqlException ex) when (ex.Number == 2627) // Unique constraint violation
+        {
+            _logger.LogError(ex, "Failed to create user - duplicate email");
+            return new RepositoryResult<int>
+            {
+                Success = false,
+                ErrorMessage = "Email address is already in use",
+                Data = 0
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create user");
+            return new RepositoryResult<int>
+            {
+                Success = false,
+                ErrorMessage = "An error occurred while creating the user",
+                Data = 0
+            };
+        }
+    }
+
+    public async Task<RepositoryResult<int>> CreateUserRoleAsync(CreateUserDto dto)
+    {
+        using var db = Connection;
+
+        // Check if email already exists
+        var existingUser = await GetByEmailAsync(dto.Email);
+        if (existingUser != null)
+        {
+            return new RepositoryResult<int>
+            {
+                Success = false,
+                ErrorMessage = "Email address is already in use",
+                Data = 0
+            };
+        }
+
+        try
+        {
+
+            var roleId = await GetByUserRoleIdByNameAsync("User");
+
+            if (roleId == null)
+            {
+                return new RepositoryResult<int>
+                {
+                    Success = false,
+                    ErrorMessage = "Role 'User' does not exist",
+                    Data = 0
+                };
+            }
+
+            var hashedPassword = _bcrypt.HashPassword(dto.Password);
+            User user = new User
+            {
+                Fullname = dto.Fullname,
+                Email = dto.Email,
+                Password = hashedPassword,
+                CreatedAt = DateTime.UtcNow,
+                RoleId = roleId.Value
+            };
+
+            var sql = @"
+                INSERT INTO Users (Fullname, Email, Password, CreatedAt, RoleId) 
+                VALUES (@Fullname, @Email, @Password, @CreatedAt, @RoleId); 
+                SELECT CAST(SCOPE_IDENTITY() as int);";
+
+            var newId = await db.ExecuteScalarAsync<int>(sql, user);
+
             return new RepositoryResult<int>
             {
                 Success = true,
@@ -135,7 +223,7 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
     public async Task<RepositoryResult<bool>> UpdateAsync(User user)
     {
         using var db = Connection;
-        
+
         // Check if email is being changed to one that already exists
         if (!string.IsNullOrEmpty(user.Email))
         {
@@ -156,7 +244,7 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
             var hashedPassword = _bcrypt.HashPassword(user.Password);
             user.Password = hashedPassword;
             user.UpdatedAt = DateTime.UtcNow;
-            
+
             var sql = @"
                 UPDATE Users 
                 SET 
@@ -165,9 +253,9 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
                     Password = @Password,
                     UpdatedAt = @UpdatedAt
                 WHERE Id = @Id";
-                
+
             var rowsAffected = await db.ExecuteAsync(sql, user);
-            
+
             return new RepositoryResult<bool>
             {
                 Success = rowsAffected > 0,
@@ -202,7 +290,7 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
         try
         {
             return await db.ExecuteAsync(
-                "DELETE FROM Users WHERE Id = @Id", 
+                "DELETE FROM Users WHERE Id = @Id",
                 new { Id = id }) > 0;
         }
         catch (Exception ex)
@@ -211,4 +299,5 @@ public class UserRepository(IConfiguration config, IBcryptService bcrypt, ILogge
             return false;
         }
     }
+
 }

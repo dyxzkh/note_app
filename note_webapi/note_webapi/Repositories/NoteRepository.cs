@@ -9,11 +9,11 @@ namespace note_webapi.Repositories;
 
 public class NoteRepository(IConfiguration config, ILogger<UserRepository> logger) : INoteRepository
 {
-    
+
     private readonly string? _connectionString = config.GetConnectionString("DefaultConnection");
     private readonly ILogger<UserRepository> _logger = logger;
     private IDbConnection Connection => new SqlConnection(_connectionString);
-    
+
     public async Task<IEnumerable<Note>> GetAllAsync()
     {
         using var db = Connection;
@@ -24,7 +24,7 @@ public class NoteRepository(IConfiguration config, ILogger<UserRepository> logge
     {
         using var db = Connection;
         return await db.QueryFirstOrDefaultAsync<Note>(
-            "SELECT * FROM Notes WHERE Id = @Id", 
+            "SELECT * FROM Notes WHERE Id = @Id",
             new { Id = id });
     }
 
@@ -32,7 +32,7 @@ public class NoteRepository(IConfiguration config, ILogger<UserRepository> logge
     {
         using var db = Connection;
         return await db.QueryAsync<Note>(
-            "SELECT * FROM Notes WHERE CreatedBy = @UserId", 
+            "SELECT * FROM Notes WHERE CreatedBy = @UserId ORDER BY CreatedAt DESC",
             new { UserId = userId });
     }
 
@@ -45,9 +45,9 @@ public class NoteRepository(IConfiguration config, ILogger<UserRepository> logge
                 INSERT INTO Notes (Title, Content, CreatedAt, CreatedBy) 
                 VALUES (@Title, @Content, @CreatedAt, @CreatedBy); 
                 SELECT CAST(SCOPE_IDENTITY() as int);";
-                
+
             var newId = await db.ExecuteScalarAsync<int>(sql, dto);
-            
+
             return new RepositoryResult<int>
             {
                 Success = true,
@@ -78,9 +78,15 @@ public class NoteRepository(IConfiguration config, ILogger<UserRepository> logge
                     Content = @Content, 
                     UpdatedAt = @UpdatedAt
                 WHERE Id = @Id";
-                
-            var rowsAffected = await db.ExecuteAsync(sql, dto);
-            
+
+            var rowsAffected = await db.ExecuteAsync(sql, new
+            {
+                Title = dto.Title,
+                Content = dto.Content,
+                UpdatedAt = dto.UpdatedAt,
+                Id = noteId,
+            });
+
             return new RepositoryResult<bool>
             {
                 Success = rowsAffected > 0,
@@ -105,7 +111,7 @@ public class NoteRepository(IConfiguration config, ILogger<UserRepository> logge
         try
         {
             return await db.ExecuteAsync(
-                "DELETE FROM Notes WHERE Id = @Id", 
+                "DELETE FROM Notes WHERE Id = @Id",
                 new { Id = id }) > 0;
         }
         catch (Exception ex)

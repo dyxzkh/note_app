@@ -1,10 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using note_webapi.DTOs;
 using note_webapi.Interfaces;
-using note_webapi.Models;
 
 namespace note_webapi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class NoteController(INoteRepository repo) : ControllerBase
@@ -24,11 +25,18 @@ public class NoteController(INoteRepository repo) : ControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
+    [HttpGet("user/{id}")]
+    public async Task<IActionResult> GetByUserId(int id)
+    {
+        var result = await _repo.GetByUserIdAsync(id);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateNoteDto dto)
     {
         var result = await _repo.CreateAsync(dto);
-    
+
         if (!result.Success)
         {
             return BadRequest(new { message = result.ErrorMessage });
@@ -40,13 +48,13 @@ public class NoteController(INoteRepository repo) : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateNoteDto dto)
     {
         var result = await _repo.UpdateAsync(id, dto);
-    
+
         if (!result.Success)
         {
             return BadRequest(new { message = result.ErrorMessage });
         }
 
-        return result.Data ? NoContent() : NotFound();
+        return result.Data ? Ok(result) : NotFound();
     }
 
     [HttpDelete("{id}")]
