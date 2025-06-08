@@ -1,5 +1,8 @@
+import LoginView from '@/views/LoginView.vue'
+import NoteView from '@/views/NoteView.vue'
+import RegisterView from '@/views/RegisterView.vue'
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,17 +10,47 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView,
+      component: NoteView,
+      meta: { title: 'Notes', requiresAuth: true },
     },
     {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
+      path: '/notes',
+      name: 'note',
+      component: NoteView,
+      meta: { title: 'Notes', requiresAuth: true },
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+      meta: { title: 'Login' },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: RegisterView,
+      meta: { title: 'Register' },
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore()
+
+  // Initialize auth state if token exists
+  if (authStore.accessToken && !authStore.userId) {
+    try {
+      await authStore.initializeAuth()
+    } catch (error) {
+      console.error('Auth initialization failed:', error)
+      return '/login'
+    }
+  }
+
+  // Redirect to login if auth is required but user is not authenticated
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return '/login'
+  }
 })
 
 export default router
